@@ -1,7 +1,5 @@
 reference = config["reference"]
-
 reads, = glob_wildcards("Reads/{read}.fa");
-
 threads = 8;
 
 onstart:
