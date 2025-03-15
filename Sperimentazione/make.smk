@@ -61,7 +61,7 @@ rule MINIMAP:
 	shell:
 		'''
 		echo "1---------------------------------Minimap2---------------------------------1\n" &&
-		{{ time ./minimap2/minimap2 -t {params.threads} "Reads/{wildcards.read}.fa" "Reads/{wildcards.read}.fa" > "Results/{wildcards.read}|minimap2|{wildcards.tp}.paf" ; }} 2>&1 | tee -a "Results/{wildcards.read}|minimap2|{wildcards.tp}-benchmark.txt" &&
+		{{ time ./minimap2/minimap2 {params.read_type} -t {params.threads} "Reads/{wildcards.read}.fa" "Reads/{wildcards.read}.fa" > "Results/{wildcards.read}|minimap2|{wildcards.tp}.paf" ; }} 2>&1 | tee -a "Results/{wildcards.read}|minimap2|{wildcards.tp}-benchmark.txt" &&
 		echo "2---------------------------------Miniasm---------------------------------2\n" &&
 		./miniasm/miniasm -f Reads/{wildcards.read}.fa "Results/{wildcards.read}|minimap2|{wildcards.tp}.paf" > "./miniasm/{wildcards.read}|minimap2|{wildcards.tp}.gfa" &&
 		awk '/^S/{{print \">\" $2 \"\\n\" $3}}' "./miniasm/{wildcards.read}|minimap2|{wildcards.tp}.gfa" | fold > "./miniasm/{wildcards.read}|minimap2|{wildcards.tp}.fa" &&
