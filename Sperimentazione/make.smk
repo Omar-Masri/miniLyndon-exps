@@ -38,11 +38,12 @@ rule CFL_ICFL:
 		preset_params= lambda wildcards: ML_PRESETS[wildcards.preset],
 		reference=reference,
 		threads=threads
+	threads: threads
 	shell:
 		"""
 		echo "1---------------------------------MiniLyndon---------------------------------1\n" &&
-		{{ time ../miniLyndon/bin/fingerprint -f "{wildcards.factorization}" -p "Reads/" -a "{wildcards.read}.fa" -n {params.threads} {params.segment_recursive_size} -c {params.comb_value} | \
-		../miniLyndon/bin/minimizer_demo -t {params.threads} {params.preset_params} | \
+		{{ time ../miniLyndon/bin/fingerprint -f "{wildcards.factorization}" -p "Reads/" -a "{wildcards.read}.fa" -n {threads} {params.segment_recursive_size} -c {params.comb_value} | \
+		../miniLyndon/bin/minimizer_demo -t {threads} {params.preset_params} | \
 		../miniLyndon/bin/postprocessing "Reads/{wildcards.read}.fa" > "Results/{wildcards.read}|miniLyndon|{wildcards.preset}|{wildcards.factorization}|{wildcards.comb}|{wildcards.size}.paf" ; }} 2>&1 | tee -a "Results/{wildcards.read}|miniLyndon|{wildcards.preset}|{wildcards.factorization}|{wildcards.comb}|{wildcards.size}-benchmark.txt"
 		"""
 
@@ -53,12 +54,12 @@ rule MINIMAP:
 		"Results/{read}|minimap2|{tp}|{factorization}|{comb}|{size}.paf"
 	params:
 		read_type = lambda wildcards: "-x ava-ont" if wildcards.tp == "ONT" else "-x ava-pb",
-		reference=reference,
-		threads=threads
+		reference=reference
+	threads: threads
 	shell:
 		"""
 		echo "1---------------------------------Minimap2---------------------------------1\n" &&
-		{{ time ./minimap2/minimap2 {params.read_type} -t {params.threads} "Reads/{wildcards.read}.fa" "Reads/{wildcards.read}.fa" > "Results/{wildcards.read}|minimap2|{wildcards.tp}|{wildcards.factorization}|{wildcards.comb}|{wildcards.size}.paf" ; }} 2>&1 | tee -a "Results/{wildcards.read}|minimap2|{wildcards.tp}|{wildcards.factorization}|{wildcards.comb}|{wildcards.size}-benchmark.txt"
+		{{ time ./minimap2/minimap2 {params.read_type} -t {threads} "Reads/{wildcards.read}.fa" "Reads/{wildcards.read}.fa" > "Results/{wildcards.read}|minimap2|{wildcards.tp}|{wildcards.factorization}|{wildcards.comb}|{wildcards.size}.paf" ; }} 2>&1 | tee -a "Results/{wildcards.read}|minimap2|{wildcards.tp}|{wildcards.factorization}|{wildcards.comb}|{wildcards.size}-benchmark.txt"
 		"""
 
 rule miniasm:
@@ -79,12 +80,12 @@ rule quast:
 	output:
 		directory("Results/{read}|{tool}|{preset}|{factorization}|{comb}|{size}|REPORT")
 	params:
-		reference=reference,
-		threads=threads
+		reference=reference
+	threads: threads
 	shell:
 		"""
 		echo "3---------------------------------Quast---------------------------------3\n" &&
-		./quast/quast.py --threads {params.threads} "./miniasm/{wildcards.read}|{wildcards.tool}|{wildcards.preset}|{wildcards.factorization}|{wildcards.comb}|{wildcards.size}.fa" -r {params.reference} -o "./Results/{wildcards.read}|{wildcards.tool}|{wildcards.preset}|{wildcards.factorization}|{wildcards.comb}|{wildcards.size}|REPORT/" &&
+		./quast/quast.py --threads {threads} "./miniasm/{wildcards.read}|{wildcards.tool}|{wildcards.preset}|{wildcards.factorization}|{wildcards.comb}|{wildcards.size}.fa" -r {params.reference} -o "./Results/{wildcards.read}|{wildcards.tool}|{wildcards.preset}|{wildcards.factorization}|{wildcards.comb}|{wildcards.size}|REPORT/" &&
 		echo "4---------------------------------Cleanup---------------------------------4\n" &&
 		mv -v -f  "Results/{wildcards.read}|{wildcards.tool}|{wildcards.preset}|{wildcards.factorization}|{wildcards.comb}|{wildcards.size}-benchmark.txt" "./Results/{wildcards.read}|{wildcards.tool}|{wildcards.preset}|{wildcards.factorization}|{wildcards.comb}|{wildcards.size}|REPORT/benchmark.txt"
 		"""
@@ -97,5 +98,5 @@ rule clean:
 		rm -f ./miniasm/*.fa
 		'''
 
-# snakemake --config reference="/home/omarm/Desktop/Paper/Sperimentazione_Lyndon/Sperimentazione/Ecoli_K12_DH10B.fasta" -s make.smk -f run --cores 1 --keep-going
+# snakemake --config reference="/home/omarm/Desktop/Paper/Sperimentazione_Lyndon/Sperimentazione/Ecoli_K12_DH10B.fasta" -s make.smk -f run --cores 16 --keep-going
 # snakemake --config reference="/home/omarm/Desktop/Paper/Sperimentazione_Lyndon/Sperimentazione/Ecoli_K12_DH10B.fasta" -s make.smk -f clean --cores 1
