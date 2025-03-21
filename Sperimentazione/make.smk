@@ -1,5 +1,5 @@
 reference = config["reference"]
-reads, = glob_wildcards("Reads/{read}.fa");
+reads, exts = glob_wildcards("Reads/{read}.{ext}");
 threads = 8;
 
 ML_PRESETS = {
@@ -7,31 +7,27 @@ ML_PRESETS = {
 	"min7": "-k 7 -w 13",
 }
 
-onstart:
-	shell('echo "0---------------------------------Setup---------------------------------0\n"')
-	shell('shopt -s nullglob; for file in Reads/*.fasta; do [ -e "$file" ] && mv -- "$file" "${{file%.fasta}}.fa"; done')
-
 rule run:
 	input:
-		expand("Results/{read}|minimap2|{tp}|0|1|2|REPORT/",
-			   read=reads,
+		expand(expand("Results/{read}.{ext}|minimap2|{{tp}}|0|1|2|REPORT/",
+					  zip, read=reads, ext=exts),
 			   tp = ["ONT", "PB"]),
-		expand("Results/{read}|miniLyndon|{preset}|CFL_ICFL|{comb}|{segment_size}|REPORT/",
-			   read=reads,
+		expand(expand("Results/{read}.{ext}|miniLyndon|{{preset}}|CFL_ICFL|{{comb}}|{{segment_size}}|REPORT/",
+					  zip, read=reads, ext=exts),
 			   segment_size=[-1,100,300,500],
-			   preset=["min5", "min7"],
+			   preset=ML_PRESETS.keys(),
 			   comb=["NONCOMB", "COMB"]),
-		expand("Results/{read}|miniLyndon|{preset}|CFL_ICFL_R|{comb}|{recursive_size}|REPORT/",
-			   read=reads,
+		expand(expand("Results/{read}.{ext}|miniLyndon|{{preset}}|CFL_ICFL_R|{{comb}}|{{recursive_size}}|REPORT/",
+					  zip, read=reads, ext=exts),
 			   recursive_size=[10,25,50],
-			   preset = ["min5", "min7"],
-			   comb = ["NONCOMB", "COMB"]),
+			   preset = ML_PRESETS.keys(),
+			   comb = ["NONCOMB", "COMB"])
 
-rule CFL_ICFL:
+rule miniLyndon:
 	input:
-		read="Reads/{read}.fa"
+		"Reads/{read}.{ext}"
 	output:
-		"Results/{read}|miniLyndon|{preset}|{factorization}|{comb}|{size}.paf"
+		"Results/{read}.{ext}|miniLyndon|{preset}|{factorization}|{comb}|{size}.paf"
 	params:
 		segment_recursive_size = lambda wildcards: "-s "+wildcards.size if wildcards.factorization == "CFL_ICFL" else "-r "+wildcards.size,
 		comb_value=lambda wildcards: 1 if wildcards.comb == "COMB" else 0,
@@ -42,16 +38,16 @@ rule CFL_ICFL:
 	shell:
 		"""
 		echo "1---------------------------------MiniLyndon---------------------------------1\n" &&
-		{{ time ../miniLyndon/bin/fingerprint -f "{wildcards.factorization}" -p "Reads/" -a "{wildcards.read}.fa" -n {threads} {params.segment_recursive_size} -c {params.comb_value} | \
+		{{ time ../miniLyndon/bin/fingerprint -f "{wildcards.factorization}" -p "Reads/" -a "{wildcards.read}.{wildcards.ext}" -n {threads} {params.segment_recursive_size} -c {params.comb_value} | \
 		../miniLyndon/bin/minimizer_demo -t {threads} {params.preset_params} | \
-		../miniLyndon/bin/postprocessing "Reads/{wildcards.read}.fa" > "Results/{wildcards.read}|miniLyndon|{wildcards.preset}|{wildcards.factorization}|{wildcards.comb}|{wildcards.size}.paf" ; }} 2>&1 | tee -a "Results/{wildcards.read}|miniLyndon|{wildcards.preset}|{wildcards.factorization}|{wildcards.comb}|{wildcards.size}-benchmark.txt"
+		../miniLyndon/bin/postprocessing "{input}" > "{output}" ; }} 2>&1 | tee -a "Results/{wildcards.read}.{wildcards.ext}|miniLyndon|{wildcards.preset}|{wildcards.factorization}|{wildcards.comb}|{wildcards.size}-benchmark.txt"
 		"""
 
-rule MINIMAP:
+rule minimap:
 	input:
-		read="Reads/{read}.fa"
+		"Reads/{read}.{ext}"
 	output:
-		"Results/{read}|minimap2|{tp}|{factorization}|{comb}|{size}.paf"
+		"Results/{read}.{ext}|minimap2|{tp}|{factorization}|{comb}|{size}.paf"
 	params:
 		read_type = lambda wildcards: "-x ava-ont" if wildcards.tp == "ONT" else "-x ava-pb",
 		reference=reference
@@ -59,35 +55,38 @@ rule MINIMAP:
 	shell:
 		"""
 		echo "1---------------------------------Minimap2---------------------------------1\n" &&
-		{{ time ./minimap2/minimap2 {params.read_type} -t {threads} "Reads/{wildcards.read}.fa" "Reads/{wildcards.read}.fa" > "Results/{wildcards.read}|minimap2|{wildcards.tp}|{wildcards.factorization}|{wildcards.comb}|{wildcards.size}.paf" ; }} 2>&1 | tee -a "Results/{wildcards.read}|minimap2|{wildcards.tp}|{wildcards.factorization}|{wildcards.comb}|{wildcards.size}-benchmark.txt"
+		{{ time ./minimap2/minimap2 {params.read_type} -t {threads} "{input}" "{input}" > "{output}" ; }} 2>&1 | \
+		tee -a "Results/{wildcards.read}.{wildcards.ext}|minimap2|{wildcards.tp}|{wildcards.factorization}|{wildcards.comb}|{wildcards.size}-benchmark.txt"
 		"""
 
 rule miniasm:
 	input:
-		"Results/{read}|{tool}|{preset}|{factorization}|{comb}|{size}.paf"
+		read="Reads/{read}.{ext}",
+		paf="Results/{read}.{ext}|{tool}|{preset}|{factorization}|{comb}|{size}.paf"
 	output:
-		"miniasm/{read}|{tool}|{preset}|{factorization}|{comb}|{size}.fa"
+		gfa="miniasm/{read}.{ext}|{tool}|{preset}|{factorization}|{comb}|{size}.gfa",
+		fa="miniasm/{read}.{ext}|{tool}|{preset}|{factorization}|{comb}|{size}.fa"
 	shell:
 		"""
 		echo "2---------------------------------Miniasm---------------------------------2\n" &&
-		./miniasm/miniasm -f Reads/{wildcards.read}.fa "Results/{wildcards.read}|{wildcards.tool}|{wildcards.preset}|{wildcards.factorization}|{wildcards.comb}|{wildcards.size}.paf" > "./miniasm/{wildcards.read}|{wildcards.tool}|{wildcards.preset}|{wildcards.factorization}|{wildcards.comb}|{wildcards.size}.gfa" &&
-		awk '/^S/{{print \">\" $2 \"\\n\" $3}}' "./miniasm/{wildcards.read}|{wildcards.tool}|{wildcards.preset}|{wildcards.factorization}|{wildcards.comb}|{wildcards.size}.gfa" | fold > "./miniasm/{wildcards.read}|{wildcards.tool}|{wildcards.preset}|{wildcards.factorization}|{wildcards.comb}|{wildcards.size}.fa"
+		./miniasm/miniasm -f "{input.read}" "{input.paf}" > "{output.gfa}" &&
+		awk '/^S/{{print \">\" $2 \"\\n\" $3}}' {output.gfa} | fold > {output.fa}
 		"""
 
 rule quast:
 	input:
-		"miniasm/{read}|{tool}|{preset}|{factorization}|{comb}|{size}.fa"
+		"miniasm/{read}.{ext}|{tool}|{preset}|{factorization}|{comb}|{size}.fa"
 	output:
-		directory("Results/{read}|{tool}|{preset}|{factorization}|{comb}|{size}|REPORT")
+		directory("Results/{read}.{ext}|{tool}|{preset}|{factorization}|{comb}|{size}|REPORT")
 	params:
 		reference=reference
 	threads: threads
 	shell:
 		"""
 		echo "3---------------------------------Quast---------------------------------3\n" &&
-		./quast/quast.py --threads {threads} "./miniasm/{wildcards.read}|{wildcards.tool}|{wildcards.preset}|{wildcards.factorization}|{wildcards.comb}|{wildcards.size}.fa" -r {params.reference} -o "./Results/{wildcards.read}|{wildcards.tool}|{wildcards.preset}|{wildcards.factorization}|{wildcards.comb}|{wildcards.size}|REPORT/" &&
+		./quast/quast.py --threads {threads} "{input}" -r {params.reference} -o "{output}" &&
 		echo "4---------------------------------Cleanup---------------------------------4\n" &&
-		mv -v -f  "Results/{wildcards.read}|{wildcards.tool}|{wildcards.preset}|{wildcards.factorization}|{wildcards.comb}|{wildcards.size}-benchmark.txt" "./Results/{wildcards.read}|{wildcards.tool}|{wildcards.preset}|{wildcards.factorization}|{wildcards.comb}|{wildcards.size}|REPORT/benchmark.txt"
+		mv -v -f "Results/{wildcards.read}.{wildcards.ext}|{wildcards.tool}|{wildcards.preset}|{wildcards.factorization}|{wildcards.comb}|{wildcards.size}-benchmark.txt" "./Results/{wildcards.read}.{wildcards.ext}|{wildcards.tool}|{wildcards.preset}|{wildcards.factorization}|{wildcards.comb}|{wildcards.size}|REPORT/benchmark.txt"
 		"""
 
 rule clean:
