@@ -71,7 +71,7 @@ rule miniasm:
 		"""
 		echo "2---------------------------------Miniasm---------------------------------2\n" &&
 		./miniasm/miniasm -f "{input.read}" "{input.paf}" > "{output.gfa}" &&
-		awk '/^S/{{print \">\" $2 \"\\n\" $3}}' {output.gfa} | fold > {output.fa}
+		awk '/^S/{{print \">\" $2 \"\\n\" $3}}' "{output.gfa}" | fold > "{output.fa}"
 		"""
 
 rule quast:
