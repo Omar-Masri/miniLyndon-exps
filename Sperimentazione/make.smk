@@ -66,6 +66,7 @@ rule miniasm:
 	output:
 		gfa="miniasm/{read}.{ext}|{tool}|{preset}|{factorization}|{comb}|{size}.gfa",
 		fa="miniasm/{read}.{ext}|{tool}|{preset}|{factorization}|{comb}|{size}.fa"
+	threads: 1
 	shell:
 		"""
 		echo "2---------------------------------Miniasm---------------------------------2\n" &&
@@ -80,7 +81,7 @@ rule quast:
 		directory("Results/{read}.{ext}|{tool}|{preset}|{factorization}|{comb}|{size}|REPORT")
 	params:
 		reference=reference
-	threads: threads
+	threads: 4
 	shell:
 		"""
 		echo "3---------------------------------Quast---------------------------------3\n" &&
