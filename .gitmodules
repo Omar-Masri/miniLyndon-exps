@@ -1,6 +1,3 @@
 [submodule "miniLyndon"]
 	path = miniLyndon
 	url = https://github.com/Omar-Masri/miniLyndon.git
-[submodule "Sperimentazione/quast"]
-	path = Sperimentazione/quast
-	url = https://github.com/ablab/quast.git
