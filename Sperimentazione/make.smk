@@ -1,6 +1,6 @@
 genomes, g_exts = glob_wildcards("Reference_Genomes/{read}.{ext}");
 
-reads, r_exts = glob_wildcards("Reads/{read}.{ext}");
+reads, r_exts = glob_wildcards("Reads/{read,E.+}.{ext}");
 threads = 8;
 
 ML_PRESETS = {
@@ -35,6 +35,68 @@ rule run:
 			recursive_size=[10,25,50],
 			preset = ML_PRESETS.keys(),
 			comb = ["NONCOMB", "COMB"])
+
+
+rule download_celegans_genome:
+    output:
+        genome = "Reference_Genomes/Celegans_UNSB01.fasta.gz",
+    params:
+        url = "https://ftp.ebi.ac.uk/pub/databases/ena/wgs/public/uns/UNSB01.fasta.gz",
+    log:
+        "Reference_Genomes/Celegans_UNSB01.wget.log",
+    shell:
+        "wget -O {output.genome} -o {log} {params.url}"
+
+rule simulate_reads:
+    input:
+        genome = "Reference_Genomes/{genome}.fasta.gz",
+    output:
+        prefix = directory("Reads/{genome}/depth_{depth}"),
+        bam = "Reads/{genome}/depth_{depth}/reads.bam",
+        maf = "Reads/{genome}/depth_{depth}/reads.maf.gz",
+    log:
+        pbsim = "Reads/{genome}/depth_{depth}/pbsim.log",
+        samtools = "Reads/{genome}/depth_{depth}/samtools.log",
+    params:
+        seed = 250323,
+        lmean = 20700,
+        lsd = 2500,
+        passnum = 20,
+        prefix = lambda wildcards, output: output[0] + "/S"
+    conda:
+        "envs/pbsim3.yml"
+    shell:
+        """
+        pbsim --strategy wgs --method qshmm --qshmm ${{CONDA_PREFIX}}/data/QSHMM-RSII.model --genome <( zcat -f {input.genome} ) --depth {wildcards.depth} --pass-num {params.passnum} --seed {params.seed} --length-mean {params.lmean} --length-sd {params.lsd} --prefix {params.prefix} 2> {log.pbsim};
+        cat {params.prefix}_*.maf.gz > {output.maf};
+        samtools cat -o {output.bam} {params.prefix}_*.bam 2> {log.samtools};
+        rm -f {params.prefix}_*.maf.gz {params.prefix}_*.bam {params.prefix}_*.ref
+        """
+
+rule extract_perfect_reads:
+    input:
+        maf = "Reads/{genome}/depth_{depth}/reads.maf.gz",
+    output:
+        reads = "Reads/{genome}.perfect.{depth}.fa",
+    shell:
+        """
+        zcat {input.maf} | awk -f scripts/maf2fa.awk > {output.reads}
+        """
+
+rule simulate_ccs_reads:
+    input:
+        bam = "Reads/{genome}/depth_{depth}/reads.bam",
+    output:
+        reads = "Reads/{genome}.ccs.{depth}.fq.gz",
+    log:
+        ccs = "Reads/{genome}.ccs.{depth}.log",
+    conda:
+        "envs/pbsim3.yml"
+    threads: 4
+    shell:
+        """
+        ccs --all --log-level INFO -j {threads} {input.bam} {output.reads} 2> {log.ccs}
+        """
 
 rule miniLyndon:
 	input:
