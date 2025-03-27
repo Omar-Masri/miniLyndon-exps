@@ -1,68 +1,92 @@
-genomes, g_exts = glob_wildcards("Reference_Genomes/{read}.{ext}");
-
-reads, r_exts = glob_wildcards("Reads/{read,E.+}.{ext}");
-threads = 8;
-
 ML_PRESETS = {
-	"min5":  "-k 5 -w 11",
-	"min7": "-k 7 -w 13",
+    "min5": "-k 5 -w 11",
+    "min7": "-k 7 -w 13",
 }
 
+MINIMAP_PRESETS = {
+    "ONT": "-x ava-ont",
+    "PB": "-x ava-pb",
+}
+
+READ_DATASETS = expand(
+    "Ecoli_K12_DH10B/{reads}", reads=["Ecoli10", "Ecoli25", "Ecoli50", "Ecoli100"]
+)
+
+TARGETS = (
+    expand(
+        "Results/{dataset}/minimap2/{tp}/quast",
+        dataset=READ_DATASETS,
+        tp=MINIMAP_PRESETS.keys(),
+    )
+    + expand(
+        "Results/{dataset}/miniLyndon/{preset}|CFL_ICFL_R|{comb}|{segment_size}/quast",
+        dataset=READ_DATASETS,
+        preset=ML_PRESETS.keys(),
+        comb=["NONCOMB", "COMB"],
+        segment_size=[-1, 100, 300, 500],
+    )
+    + expand(
+        "Results/{dataset}/miniLyndon/{preset}|CFL_ICFL_R|{comb}|{recursive_size}/quast",
+        dataset=READ_DATASETS,
+        preset=ML_PRESETS.keys(),
+        comb=["NONCOMB", "COMB"],
+        recursive_size=[10, 25, 50],
+    )
+)
+
+
 rule run:
-	input:
-		expand(
-			expand(
-				expand(
-					"Results/{{reference}}.{{g_ext}}/{read}.{r_ext}|minimap2|{{{{tp}}}}|0|1|2|REPORT/",
-					zip, read=reads, r_ext=r_exts),
-				zip, reference=genomes, g_ext=g_exts),
-			tp = ["ONT", "PB"]),
-		expand(
-			expand(
-				expand(
-					"Results/{{reference}}.{{g_ext}}/{read}.{r_ext}|miniLyndon|{{{{preset}}}}|CFL_ICFL_R|{{{{comb}}}}|{{{{segment_size}}}}|REPORT/",
-					zip, read=reads, r_ext=r_exts),
-				zip, reference=genomes, g_ext=g_exts),
-			segment_size=[-1,100,300,500],
-			preset = ML_PRESETS.keys(),
-			comb = ["NONCOMB", "COMB"]),
-		expand(
-			expand(
-				expand(
-					"Results/{{reference}}.{{g_ext}}/{read}.{r_ext}|miniLyndon|{{{{preset}}}}|CFL_ICFL_R|{{{{comb}}}}|{{{{recursive_size}}}}|REPORT/",
-					zip, read=reads, r_ext=r_exts),
-				zip, reference=genomes, g_ext=g_exts),
-			recursive_size=[10,25,50],
-			preset = ML_PRESETS.keys(),
-			comb = ["NONCOMB", "COMB"])
+    input:
+        TARGETS,
+
+
+rule multiqc:
+    input:
+        TARGETS,
+    output:
+        directory("multiqc_report"),
+    conda:
+        "envs/multiqc.yml"
+    shell:
+        """multiqc -o "{output}" -d --force {input:q}"""
+
+
+rule gunzip_ref_genome:
+    input:
+        "Reference_Genomes/{genome}.fa.gz",
+    output:
+        temp("Reference_Genomes/{genome}.fa"),
+    shell:
+        "gunzip -k {input}"
 
 
 rule download_celegans_genome:
     output:
-        genome = "Reference_Genomes/Celegans_UNSB01.fasta.gz",
+        genome="Reference_Genomes/Celegans_UNSB01.fa.gz",
     params:
-        url = "https://ftp.ebi.ac.uk/pub/databases/ena/wgs/public/uns/UNSB01.fasta.gz",
+        url="https://ftp.ebi.ac.uk/pub/databases/ena/wgs/public/uns/UNSB01.fasta.gz",
     log:
         "Reference_Genomes/Celegans_UNSB01.wget.log",
     shell:
         "wget -O {output.genome} -o {log} {params.url}"
 
+
 rule simulate_reads:
     input:
-        genome = "Reference_Genomes/{genome}.fasta.gz",
+        genome="Reference_Genomes/{genome}.fasta.gz",
     output:
-        prefix = directory("Reads/{genome}/depth_{depth}"),
-        bam = "Reads/{genome}/depth_{depth}/reads.bam",
-        maf = "Reads/{genome}/depth_{depth}/reads.maf.gz",
+        prefix=directory("Reads/{genome}/depth_{depth}"),
+        bam="Reads/{genome}/depth_{depth}/reads.bam",
+        maf="Reads/{genome}/depth_{depth}/reads.maf.gz",
     log:
-        pbsim = "Reads/{genome}/depth_{depth}/pbsim.log",
-        samtools = "Reads/{genome}/depth_{depth}/samtools.log",
+        pbsim="Reads/{genome}/depth_{depth}/pbsim.log",
+        samtools="Reads/{genome}/depth_{depth}/samtools.log",
     params:
-        seed = 250323,
-        lmean = 20700,
-        lsd = 2500,
-        passnum = 20,
-        prefix = lambda wildcards, output: output[0] + "/S"
+        seed=250323,
+        lmean=20700,
+        lsd=2500,
+        passnum=20,
+        prefix=lambda wildcards, output: output[0] + "/S",
     conda:
         "envs/pbsim3.yml"
     shell:
@@ -73,105 +97,125 @@ rule simulate_reads:
         rm -f {params.prefix}_*.maf.gz {params.prefix}_*.bam {params.prefix}_*.ref
         """
 
+
 rule extract_perfect_reads:
     input:
-        maf = "Reads/{genome}/depth_{depth}/reads.maf.gz",
+        maf="Reads/{genome}/depth_{depth}/reads.maf.gz",
     output:
-        reads = "Reads/{genome}.perfect.{depth}.fa",
+        reads="Reads/{genome}.perfect.{depth}.fa",
     shell:
         """
         zcat {input.maf} | awk -f scripts/maf2fa.awk > {output.reads}
         """
 
+
 rule simulate_ccs_reads:
     input:
-        bam = "Reads/{genome}/depth_{depth}/reads.bam",
+        bam="Reads/{genome}/depth_{depth}/reads.bam",
     output:
-        reads = "Reads/{genome}.ccs.{depth}.fq.gz",
+        reads="Reads/{genome}.ccs.{depth}.fq.gz",
     log:
-        ccs = "Reads/{genome}.ccs.{depth}.log",
+        ccs="Reads/{genome}.ccs.{depth}.log",
     conda:
         "envs/pbsim3.yml"
-    threads: 4
+    threads: 8
     shell:
         """
         ccs --all --log-level INFO -j {threads} {input.bam} {output.reads} 2> {log.ccs}
         """
 
+
 rule miniLyndon:
-	input:
-		"Reads/{read}.{r_ext}"
-	output:
-		paf="Results/{reference}.{g_ext}/{read}.{r_ext}|miniLyndon|{preset}|{factorization}|{comb}|{size}.paf",
-		txt="Results/{reference}.{g_ext}/{read}.{r_ext}|miniLyndon|{preset}|{factorization}|{comb}|{size}-benchmark.txt"
-	params:
-		segment_recursive_size = lambda wildcards: "-s "+wildcards.size if wildcards.factorization == "CFL_ICFL" else "-r "+wildcards.size,
-		comb_value=lambda wildcards: 1 if wildcards.comb == "COMB" else 0,
-		preset_params= lambda wildcards: ML_PRESETS[wildcards.preset]
-	threads: threads
-	shell:
-		"""
-		echo "1---------------------------------MiniLyndon---------------------------------1\n" &&
-		{{ time ../miniLyndon/bin/fingerprint -f "{wildcards.factorization}" -p "Reads/" -a "{wildcards.read}.{wildcards.r_ext}" -n {threads} {params.segment_recursive_size} -c {params.comb_value} | \
-		../miniLyndon/bin/minimizer_demo -t {threads} {params.preset_params} | \
-		../miniLyndon/bin/postprocessing "{input}" > "{output.paf}" ; }} 2>&1 | tee -a "{output.txt}"
-		"""
+    input:
+        fa="Reads/{read}.fa",
+    output:
+        paf="Results/{reference}/{read}/miniLyndon/{preset}|{factorization}|{comb}|{size}.paf",
+    log:
+        "Results/{reference}/{read}/miniLyndon/{preset}|{factorization}|{comb}|{size}.log",
+    benchmark:
+        "Results/{reference}/{read}/miniLyndon/{preset}|{factorization}|{comb}|{size}.tsv"
+    params:
+        segment_recursive_size=lambda wildcards: (
+            "-s " + wildcards.size
+            if wildcards.factorization == "CFL_ICFL"
+            else "-r " + wildcards.size
+        ),
+        comb_value=lambda wildcards: 1 if wildcards.comb == "COMB" else 0,
+        preset_params=lambda wildcards: ML_PRESETS[wildcards.preset],
+        prefix=lambda wildcards, input: subpath(input.fa, parent=True) + "/",
+        read_file_name=lambda wildcards, input: subpath(input.fa, basename=True),
+    threads: 4
+    shell:
+        """
+        {{ ../miniLyndon/bin/fingerprint -f "{wildcards.factorization}" -p "{params.prefix}" -a "{params.read_file_name}" -n {threads} {params.segment_recursive_size} -c {params.comb_value} | \
+        ../miniLyndon/bin/minimizer_demo -t {threads} {params.preset_params} | \
+        ../miniLyndon/bin/postprocessing "{input.fa}" > "{output.paf}" ; }} &> "{log}"
+        """
+
 
 rule minimap:
-	input:
-		"Reads/{read}.{r_ext}"
-	output:
-		paf="Results/{reference}.{g_ext}/{read}.{r_ext}|minimap2|{tp}|{factorization}|{comb}|{size}.paf",
-		txt="Results/{reference}.{g_ext}/{read}.{r_ext}|minimap2|{tp}|{factorization}|{comb}|{size}-benchmark.txt"
-	params:
-		read_type = lambda wildcards: "-x ava-ont" if wildcards.tp == "ONT" else "-x ava-pb",
-	threads: threads
-	shell:
-		"""
-		echo "1---------------------------------Minimap2---------------------------------1\n" &&
-		{{ time minimap2 {params.read_type} -t {threads} "{input}" "{input}" > "{output.paf}" ; }} 2>&1 | \
-		tee -a "{output.txt}"
-		"""
+    input:
+        "Reads/{read}.fa",
+    output:
+        paf="Results/{reference}/{read}/minimap2/{tp}.paf",
+    log:
+        "Results/{reference}/{read}/minimap2/{tp}.log",
+    benchmark:
+        "Results/{reference}/{read}/minimap2/{tp}.tsv"
+    params:
+        read_type=lambda wildcards: MINIMAP_PRESETS[wildcards.tp],
+    threads: 4
+    conda:
+        "envs/minimap2.yml"
+    shell:
+        """
+        minimap2 {params.read_type} -t {threads} "{input}" "{input}" > "{output.paf}" 2> "{log}"
+        """
+
 
 rule miniasm:
-	input:
-		read="Reads/{read}.{r_ext}",
-		paf="Results/{reference}.{g_ext}/{read}.{r_ext}|{tool}|{preset}|{factorization}|{comb}|{size}.paf"
-	output:
-		gfa="miniasm/{reference}.{g_ext}/{read}.{r_ext}|{tool}|{preset}|{factorization}|{comb}|{size}.gfa",
-		fa="miniasm/{reference}.{g_ext}/{read}.{r_ext}|{tool}|{preset}|{factorization}|{comb}|{size}.fa"
-	threads: 1
-	shell:
-		"""
-		echo "2---------------------------------Miniasm---------------------------------2\n" &&
-		miniasm -f "{input.read}" "{input.paf}" > "{output.gfa}" &&
-		awk '/^S/{{print \">\" $2 \"\\n\" $3}}' "{output.gfa}" | fold > "{output.fa}"
-		"""
+    input:
+        read="Reads/{read}.fa",
+        paf="Results/{reference}/{read}/{tool}/{conf}.paf",
+    output:
+        gfa="Results/{reference}/{read}/{tool}/{conf}/miniasm_graph.gfa",
+        fa="Results/{reference}/{read}/{tool}/{conf}/miniasm_asm.fa",
+    log:
+        "Results/{reference}/{read}/{tool}/{conf}/miniasm.log",
+    threads: 1
+    conda:
+        "envs/miniasm.yml"
+    shell:
+        """
+        miniasm -f "{input.read}" "{input.paf}" > "{output.gfa}" 2> "{log}" &&
+        awk '/^S/{{print \">\" $2 \"\\n\" $3}}' "{output.gfa}" | fold > "{output.fa}"
+        """
+
 
 rule quast:
-	input:
-		genome="Reference_Genomes/{reference}.{g_ext}",
-		fa="miniasm/{reference}.{g_ext}/{read}.{r_ext}|{tool}|{preset}|{factorization}|{comb}|{size}.fa"
-	output:
-		directory=directory("Results/{reference}.{g_ext}/{read}.{r_ext}|{tool}|{preset}|{factorization}|{comb}|{size}|REPORT"),
-		benchmark="Results/{reference}.{g_ext}/{read}.{r_ext}|{tool}|{preset}|{factorization}|{comb}|{size}|REPORT/benchmark.txt"
-	threads: 4
-	shell:
-		"""
-		echo "3---------------------------------Quast---------------------------------3\n" &&
-		quast --threads {threads} "{input.fa}" -r "{input.genome}" -o "{output.directory}" &&
-		echo "4---------------------------------Cleanup---------------------------------4\n" &&
-		mv -v -f "Results/{wildcards.reference}.{wildcards.g_ext}/{wildcards.read}.{wildcards.r_ext}|{wildcards.tool}|{wildcards.preset}|{wildcards.factorization}|{wildcards.comb}|{wildcards.size}-benchmark.txt" "{output.benchmark}"
-		"""
+    input:
+        genome="Reference_Genomes/{reference}.fa",
+        fa="Results/{reference}/{read}/{tool}/{conf}/miniasm_asm.fa",
+    output:
+        folder=directory("Results/{reference}/{read}/{tool}/{conf}/quast"),
+    log:
+        "Results/{reference}/{read}/{tool}/{conf}/quast.log",
+    threads: 1
+    conda:
+        "envs/quast.yml"
+    shell:
+        """
+        quast --threads {threads} "{input.fa}" -r "{input.genome}" -o "{output.folder}" &> "{log}"
+        """
 
-rule clean:
-	shell:
-		'''
-		rm -f -r Results
-		rm -f -r ./miniasm/*
-		'''
 
-# snakemake -s make.smk -f run --cores 2 --keep-going
-# snakemake -s make.smk -f clean --cores 1 --keep-going
-
-# TODO BENCHMARK:
+# rule clean:
+#     shell:
+#         """
+#         rm -f -r Results
+#         rm -f -r ./miniasm/*
+#         """
+#
+#
+# snakemake --sdm conda -s make.smk --cores 8
+# snakemake --sdm conda -s make.smk --cores 8 -f multiqc
