@@ -1,0 +1,7 @@
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - pbccs=6.4.0
+  - pbsim3=3.0.5
+  - samtools=1.9
