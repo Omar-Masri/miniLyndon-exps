@@ -10,6 +10,10 @@ MINIMAP_PRESETS = {
 
 READ_DATASETS = expand(
     "Ecoli_K12_DH10B/{reads}", reads=["Ecoli10", "Ecoli25", "Ecoli50", "Ecoli100"]
+) + expand(
+    "Celegans_UNSB01/Celegans_UNSB01.{type}.{cov}",
+    type=["perfect", "ccs"],
+    cov=[10, 25, 50],
 )
 
 TARGETS = (
@@ -23,7 +27,11 @@ TARGETS = (
         dataset=READ_DATASETS,
         preset=ML_PRESETS.keys(),
         comb=["NONCOMB", "COMB"],
-        segment_size=[100, 300, 500],  # Removed -1 since it is not able to find (enough) overlaps w/o cutting the read
+        segment_size=[
+            100,
+            300,
+            500,
+        ],  # Removed -1 since it is not able to find (enough) overlaps w/o cutting the read
     )
     + expand(
         "Results/{dataset}/miniLyndon/{preset}|CFL_ICFL_R|{comb}|{recursive_size}/quast",
@@ -122,6 +130,17 @@ rule simulate_ccs_reads:
     shell:
         """
         ccs --all --log-level INFO -j {threads} {input.bam} {output.reads} 2> {log.ccs}
+        """
+
+
+rule fq2fa:
+    input:
+        fq="Reads/{read}.fq.gz",
+    output:
+        fa="Reads/{read}.fa",
+    shell:
+        """
+        zcat {input.fq} | awk '(NR % 4 == 1) {{ print }} (NR % 4 == 2) {{ print }}' | sed 's/^@/>/' > {output.fa}
         """
 
 
