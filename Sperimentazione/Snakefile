@@ -1,3 +1,6 @@
+from pathlib import Path
+
+
 ML_PRESETS = {
     "min5": "-k 5 -w 11",
     "min7": "-k 7 -w 13",
@@ -42,21 +45,62 @@ TARGETS = (
     )
 )
 
+ALL_REPORTS = ["multiqc/all.html"] + expand(
+    "multiqc/{dataset}/report.html",
+    dataset=(
+        ["Ecoli_K12_DH10B", "Celegans_UNSB01"]
+        + expand(
+            "Ecoli_K12_DH10B/{reads}",
+            reads=["Ecoli10", "Ecoli25", "Ecoli50", "Ecoli100"],
+        )
+        + expand("Celegans_UNSB01/Celegans_UNSB01.{type}", type=["perfect", "ccs"])
+        + expand(
+            "Celegans_UNSB01/Celegans_UNSB01.{type}.{cov}",
+            type=["perfect", "ccs"],
+            cov=[10, 25, 50],
+        )
+    ),
+)
+
 
 rule run:
     input:
         TARGETS,
 
 
+rule multiqc_all:
+    input:
+        ALL_REPORTS,
+
+
 rule multiqc:
     input:
         targets=TARGETS,
     output:
-        directory("multiqc_report"),
+        html="multiqc/all.html",
+    params:
+        prefix=lambda wildcards, input, output: subpath(output.html, parent=True),
     conda:
         "envs/multiqc.yml"
     shell:
-        """multiqc -o "{output}" -dd 5 --force {input.targets:q}"""
+        """multiqc -o "{params.prefix}" -d  -s -i 'All datasets' -n all --force {input.targets:q}"""
+
+
+rule multiqc_dataset:
+    input:
+        targets=lambda wildcards: [
+            str(p)
+            for p in Path("Results").glob("**/quast")
+            if str(p).startswith("Results/" + wildcards.dataset)
+        ],
+    output:
+        html="multiqc/{dataset}/report.html",
+    params:
+        prefix=lambda wildcards, input, output: subpath(output.html, parent=True),
+    conda:
+        "envs/multiqc.yml"
+    shell:
+        """multiqc -o "{params.prefix}" -d  -s -i '{wildcards.dataset}' -n report --force {input.targets:q}"""
 
 
 rule gunzip_ref_genome:
