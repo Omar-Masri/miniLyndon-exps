@@ -4,3 +4,6 @@
 tmp/
 env/
 .snakemake/
+Reads/
+Genomes
+Results/
