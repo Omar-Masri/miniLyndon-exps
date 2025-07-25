@@ -19,6 +19,12 @@ READ_DATASETS = expand(
     cov=[10, 25, 50],
 )
 
+PLAIN_READ_DATASETS = ["Ecoli10", "Ecoli25", "Ecoli50", "Ecoli100"] + expand(
+    "Celegans_UNSB01.{type}.{cov}",
+    type=["perfect", "ccs"],
+    cov=[10, 25, 50],
+)
+
 TARGETS = (
     expand(
         "Results/{dataset}/minimap2/{tp}/quast",
@@ -71,6 +77,28 @@ rule run:
 rule multiqc_all:
     input:
         ALL_REPORTS,
+
+
+rule read_stats_all:
+    input:
+        read_stats=expand("Reads/{dataset}-stats.csv", dataset=PLAIN_READ_DATASETS),
+    output:
+        all_stats="Reads/all-stats.csv",
+    conda:
+        "envs/csvkit.yml"
+    shell:
+        """csvstack --filenames {input.read_stats} > {output.all_stats}"""
+
+
+rule read_stats:
+    input:
+        reads="Reads/{reads}.fa",
+    output:
+        stats="Reads/{reads}-stats.csv",
+    shell:
+        """
+        python3 scripts/fastaq_stats.py < {input.reads} > {output.stats}
+        """
 
 
 rule multiqc:
