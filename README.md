@@ -1,1 +1,1 @@
-# Sperimentazione_Lyndon
+# miniLyndon-exps
