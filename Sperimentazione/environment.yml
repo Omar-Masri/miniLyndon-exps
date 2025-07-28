@@ -2,6 +2,6 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
-  - pygments=2.19
-  - snakefmt=0.11
   - snakemake-minimal=9.1
+  - conda=25.5
+  - zstd
