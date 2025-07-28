@@ -1,0 +1,15 @@
+// File: factorization_comb.h
+
+#ifndef FACTORIZATION_COMB_H  
+#define FACTORIZATION_COMB_H 
+
+#include <vector>
+#include <tuple>
+#include <string>
+
+using namespace std;
+
+string reverse_complement(string sequenza);
+vector<int> factorization(const string& s, int T, Args args);
+
+#endif // FACTORIZATION_COMB_H

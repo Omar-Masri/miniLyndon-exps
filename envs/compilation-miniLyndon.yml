@@ -1,0 +1,8 @@
+channels:
+  - conda-forge
+dependencies:
+  - c-compiler=1.9
+  - pkg-config=0.29
+  - cxx-compiler=1.9
+  - make=4.4
+  - glib=2.82

@@ -227,8 +227,24 @@ rule fq2fa:
         """
 
 
+rule compile_miniLyndon:
+    output:
+        bin_fingerprint="miniLyndon/bin/fingerprint",
+        bin_minimizer_demo="miniLyndon/bin/minimizer_demo",
+        bin_postprocessing="miniLyndon/bin/postprocessing",
+    conda:
+        "envs/compilation-miniLyndon.yml"
+    shell:
+        """
+        make -C ./miniLyndon/ -j {threads}
+        """
+
+
 rule miniLyndon:
     input:
+        bin_fingerprint="miniLyndon/bin/fingerprint",
+        bin_minimizer_demo="miniLyndon/bin/minimizer_demo",
+        bin_postprocessing="miniLyndon/bin/postprocessing",
         fa="Reads/{read}.fa",
     output:
         paf="Results/{reference}/{read}/miniLyndon/{preset}|{factorization}|{comb}|{size}.paf",
@@ -249,9 +265,11 @@ rule miniLyndon:
     threads: 4
     shell:
         """
-        {{ ../miniLyndon/bin/fingerprint -f "{wildcards.factorization}" -p "{params.prefix}" -a "{params.read_file_name}" -n {threads} {params.segment_recursive_size} -c {params.comb_value} | \
-        ../miniLyndon/bin/minimizer_demo -t {threads} {params.preset_params} | \
-        ../miniLyndon/bin/postprocessing "{input.fa}" > "{output.paf}" ; }} &> "{log}"
+        {{
+            {input.bin_fingerprint} -f "{wildcards.factorization}" -p "{params.prefix}" -a "{params.read_file_name}" -n {threads} {params.segment_recursive_size} -c {params.comb_value} | \
+            {input.bin_minimizer_demo} -t {threads} {params.preset_params} | \
+            {input.bin_postprocessing} "{input.fa}" > "{output.paf}" ;
+        }} &> "{log}"
         """
 
 

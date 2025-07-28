@@ -1,0 +1,31 @@
+// File: fingerprint_utils.h
+
+#ifndef FINGERPRINT_UTILS_H   
+#define FINGERPRINT_UTILS_H 
+
+#include <vector>
+#include <tuple>
+#include <string>
+
+using namespace std;
+
+// Definizione di una struttura per memorizzare gli argomenti
+struct Args {
+    string path = "training/";
+    string type_factorization = "CFL";
+    string fasta = "transcript_genes.fa";
+    string fingerprint = "prova_fingerprint.txt";
+    string fact = "create";
+    string shift = "shift";
+    string filter = "list";
+    int cfl_max = 30;
+    int recursive_size = 25;
+    int segment_size = -1;
+    int n = 1;
+    bool comb = false;
+};
+
+void extract_long_reads(Args args, string name_file, int remainder);
+string calculate_fingerprint(string s, int T);
+
+#endif // FINGERPRINT_UTILS_H
