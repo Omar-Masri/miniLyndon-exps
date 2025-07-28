@@ -153,7 +153,7 @@ rule download_celegans_genome:
 
 rule simulate_reads:
     input:
-        genome="Genomes/{genome}.fasta.gz",
+        genome="Genomes/{genome}.fa.gz",
     output:
         prefix=directory("Reads/{genome}/depth_{depth}"),
         bam="Reads/{genome}/depth_{depth}/reads.bam",
