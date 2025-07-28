@@ -205,6 +205,17 @@ rule simulate_ccs_reads:
         """
 
 
+rule unzstd:
+    input:
+        zst="Reads/{read}.fa.zst",
+    output:
+        fa="Reads/{read}.fa",
+    shell:
+        """
+        unzstd --long=31 {input.zst}
+        """
+
+
 rule fq2fa:
     input:
         fq="Reads/{read}.fq.gz",
