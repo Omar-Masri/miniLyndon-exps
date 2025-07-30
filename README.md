@@ -13,5 +13,14 @@ Commands needed to reproduce the experiments:
 conda env create -p ./local-env -f environment.yml
 conda activate ./local-env
 snakemake --sdm=conda --conda-create-envs-only
+
+## Execute all the experiments
 snakemake --sdm=conda --cores=16   ## Replace 16 with the number of CPU cores you want to use
+
+## Prepare the MultiQC reports
+snakemake --cores=16 --sdm=conda multiqc_all
+
+## Compute statistics about the simulated reads
+snakemake --cores=16 --sdm=conda read_stats_all
+
 ```
