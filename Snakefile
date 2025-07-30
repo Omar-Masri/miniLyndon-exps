@@ -35,7 +35,7 @@ TARGETS = (
         "Results/{dataset}/miniLyndon/{preset}|CFL_ICFL|{comb}|{segment_size}/quast",
         dataset=READ_DATASETS,
         preset=ML_PRESETS.keys(),
-        comb=["NONCOMB", "COMB"],
+        comb=["NONCOMB"],
         segment_size=[
             100,
             300,
@@ -46,7 +46,7 @@ TARGETS = (
         "Results/{dataset}/miniLyndon/{preset}|CFL_ICFL_R|{comb}|{recursive_size}/quast",
         dataset=READ_DATASETS,
         preset=ML_PRESETS.keys(),
-        comb=["NONCOMB", "COMB"],
+        comb=["NONCOMB"],
         recursive_size=[10, 25, 50],
     )
 )
